@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>梅ノ華プロジェクト</title>
+
+<script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
+
+<style>
+body{
+margin:0;
+font-family:sans-serif;
+background:url("bg.jpg") no-repeat center/cover;
+}
+
+.wrapper{
+background:rgba(255,255,255,0.9);
+min-height:100vh;
+padding:20px;
+}
+
+/* タイトル */
+.title{text-align:center;color:#c62828;}
+
+/* スタンプ */
+.stamps{
+display:flex;
+justify-content:space-between;
+margin:15px 0;
+}
+.stamp{
+width:70px;height:100px;
+border-radius:50%;
+border:2px dashed #bbb;
+display:flex;justify-content:center;align-items:center;
+font-size:11px;color:#aaa;text-align:center;
+}
+.active{border:3px solid red;background:#fff0f0;color:red;}
+.lock{opacity:0.3;}
+
+.next{text-align:center;color:red;font-weight:bold;}
+
+/* ボタン */
+.btn{
+width:100%;padding:15px;margin-top:10px;
+border:none;border-radius:30px;font-size:16px;
+}
+.scan{background:linear-gradient(red,orange);color:white;}
+.reset{background:#eee;}
+
+/* カメラ */
+#camera{
+display:none;
+position:relative;
+margin-top:15px;
+}
+video{width:100%;border-radius:10px;}
+
+/* 読み取り枠 */
+.scan-box{
+position:absolute;
+top:25%;left:25%;
+width:50%;height:50%;
+border:3px solid red;
+border-radius:10px;
+}
+
+/* ステータス */
+.status{
+text-align:center;
+margin-top:5px;
+color:#333;
+}
+
+/* 成功演出 */
+.success{
+position:fixed;
+top:0;left:0;
+width:100%;height:100%;
+background:rgba(0,0,0,0.7);
+display:flex;
+justify-content:center;
+align-items:center;
+color:white;
+font-size:30px;
+z-index:999;
+}
+</style>
+</head>
+
+<body>
+
+<div class="wrapper">
+
+<h1 class="title">梅ノ華プロジェクト</h1>
+
+<div class="stamps">
+<div id="s1" class="stamp">天満宮</div>
+<div id="s2" class="stamp lock">観世音寺</div>
+<div id="s3" class="stamp lock">戒壇院</div>
+<div id="s4" class="stamp lock">榎社</div>
+<div id="s5" class="stamp lock">政庁跡</div>
+</div>
+
+<div id="next" class="next"></div>
+
+<button class="btn scan" onclick="start()">📷 QRを読み取る</button>
+<button class="btn reset" onclick="reset()">↺ リセット</button>
+
+<div id="camera">
+<video id="video" autoplay playsinline></video>
+<div class="scan-box"></div>
+<div class="status" id="status">カメラ起動中...</div>
+</div>
+
+</div>
+
+<script>
+const order=["s1","s2","s3","s4","s5"];
+let scanning=false;
+
+// 更新
+function update(){
+let saved=JSON.parse(localStorage.getItem("stamps")||"[]");
+
+order.forEach((id,i)=>{
+let el=document.getElementById(id);
+el.classList.remove("active","lock");
+
+if(saved.includes(id)){
+el.classList.add("active");
+}else if(i>saved.length){
+el.classList.add("lock");
+}
+});
+
+document.getElementById("next").innerText=
+saved.length<5?"👉 次はここ！":"🎉コンプリート！";
+}
+window.onload=update;
+
+// カメラ起動
+function start(){
+document.getElementById("camera").style.display="block";
+document.getElementById("status").innerText="カメラ起動中...";
+
+navigator.mediaDevices.getUserMedia({video:true})
+.then(s=>{
+video.srcObject=s;
+scanning=true;
+scan();
+})
+.catch(()=>{
+alert("カメラ許可が必要です");
+});
+}
+
+// スキャン
+function scan(){
+if(!scanning) return;
+
+let canvas=document.createElement("canvas");
+let ctx=canvas.getContext("2d");
+
+if(video.readyState===video.HAVE_ENOUGH_DATA){
+canvas.width=video.videoWidth;
+canvas.height=video.videoHeight;
+ctx.drawImage(video,0,0);
+
+let img=ctx.getImageData(0,0,canvas.width,canvas.height);
+let code=jsQR(img.data,img.width,img.height);
+
+if(code){
+document.getElementById("status").innerText="QR検出！";
+check(code.data);
+return;
+}
+}
+
+requestAnimationFrame(scan);
+}
+
+// 判定
+function check(qr){
+scanning=false;
+
+let saved=JSON.parse(localStorage.getItem("stamps")||"[]");
+let target="s"+qr.replace("spot","");
+
+if(order[saved.length]!==target){
+alert("順番が違います！");
+return;
+}
+
+saved.push(target);
+localStorage.setItem("stamps",JSON.stringify(saved));
+update();
+
+playSound();
+showSuccess();
+
+if(saved.length===5){
+setTimeout(()=>alert("🎉完全制覇！！🎉"),500);
+}
+}
+
+// 音
+function playSound(){
+let audio=new Audio("https://www.soundjay.com/buttons/sounds/button-3.mp3");
+audio.play();
+}
+
+// 成功演出
+function showSuccess(){
+let div=document.createElement("div");
+div.className="success";
+div.innerText="✔ 成功！";
+document.body.appendChild(div);
+
+setTimeout(()=>div.remove(),1200);
+}
+
+// リセット
+function reset(){
+localStorage.removeItem("stamps");
+update();
+}
+</script>
+
+</body>
+</html>
